@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 import { extractComponentStyle } from '../../core'
 import { extend, extendKeys } from '../../utils'
 
@@ -40,9 +58,6 @@ function getIndicatorItemStyle (spec, isActive) {
 function _render (context, h) {
   const children = []
   const mergedStyle = extractComponentStyle(context)
-  // const mergedStyle = context._getComponentStyle(context.$vnode.data)
-  // context.$vnode.data.cached = {}
-  // extendKeys(context.$vnode.data.cached, mergedStyle, ['width', 'height'])
   const indicatorSpecStyle = extendKeys(
       {},
       mergedStyle,
@@ -89,8 +104,8 @@ function _getVirtualRect (context, mergedStyle) {
 function _getLtbr (context, mergedStyle) {
   return ['left', 'top', 'bottom', 'right'].reduce((pre, key) => {
     const msv = mergedStyle && mergedStyle[key]
-    // undefined, null, or '0px' -> o
-    pre[key] = msv && parseFloat(msv) || 0
+    if (!msv && msv !== 0) { return pre }
+    pre[key] = parseFloat(msv)
     return pre
   }, {})
 }
@@ -125,13 +140,20 @@ function _reLayout (context, virtualRect, ltbr) {
     return pre
   }, {})
   extend(el.style, rectWithPx)
-  const axisMap = [
-    { dir: ltbr.left ? 'left' : ltbr.right ? 'right' : 'left', scale: 'width' },
-    { dir: ltbr.top ? 'top' : ltbr.bottom ? 'bottom' : 'top', scale: 'height' }
-  ]
+  const axisMap = [{
+    dir: ltbr.left || ltbr.left === 0
+      ? 'left' : ltbr.right || ltbr.right === 0
+      ? 'right' : 'left',
+    scale: 'width'
+  }, {
+    dir: ltbr.top || ltbr.top === 0
+      ? 'top' : ltbr.bottom || ltbr.bottom === 0
+      ? 'bottom' : 'top',
+    scale: 'height'
+  }]
   Object.keys(axisMap).forEach(key => {
     const { dir, scale } = axisMap[key]
-    el.style[dir] = ltbr[dir] + virtualRect[scale] / 2 - rect[scale] / 2 + 'px'
+    el.style[dir] = (ltbr[dir] || 0) + virtualRect[scale] / 2 - rect[scale] / 2 + 'px'
   })
 }
 
@@ -142,11 +164,18 @@ export default {
       this.$el.style.visibility = 'visible'
     }
   },
-  props: {
-    count: [Number, String],
-    active: [Number, String]
+  data () {
+    return {
+      count: 0,
+      active: 0
+    }
   },
   render (createElement) {
+    const { count, active } = this.$vnode.data.attrs || {}
+    this.count = count
+    this.active = active
+    if (!this.count) { return }
+    this._renderHook()
     return _render(this, createElement)
   },
   _css

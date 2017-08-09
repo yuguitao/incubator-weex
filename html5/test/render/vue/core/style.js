@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 import { init } from '../helper/runtime'
 import div from '../../../../render/vue/components/div'
 import image from '../../../../render/vue/components/image'
@@ -27,7 +45,7 @@ init('core style', (Vue, helper) => {
     helper.register('image', image)
   })
 
-  it('should get normalized merged styles.', function () {
+  it('should get normalized merged styles.', function (done) {
     const vm = helper.createVm(scopedStyleBundle)
     const el = vm.$refs.foo.$el || vm.$refs.foo
     expect(el).to.be.ok
@@ -61,5 +79,18 @@ init('core style', (Vue, helper) => {
       transformRes.push(el.style[k] === expectedTransform[k])
     }
     expect(transformRes).to.include(true)
+
+    const id = 'test-style'
+    helper.registerDone(id, () => {
+      expect(el.style.backgroundImage).to.match(
+        /(?:-webkit-|-moz-|-ms-|-o-)?linear-gradient\(to top, (?:rgb\(245, 254, 253\)|#f5fefd), (?:rgb\(255, 255, 255\)|#ffffff)\)/)
+      expect(['-webkit-box',
+        '-moz-box',
+        '-ms-flexbox',
+        '-webkit-flex',
+        'flex']).to.include(el.style.display)
+      helper.unregisterDone(id)
+      done()
+    })
   })
 })

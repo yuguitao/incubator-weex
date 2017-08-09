@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 var rollupConfig = require('./config')('weex-vue-render', true)
 var path = require('path')
 var flow = require('rollup-plugin-flow')
@@ -38,18 +56,24 @@ rollupConfig.plugins.splice(-2, 1, flow())
 
 rollupConfig.format = 'iife'
 rollupConfig.sourceMap = 'inline'
+rollupConfig.intro = `describe('ignore inject function from postcss', function () {
+    it('ignore', function () {
+        var shouldBe = 'test'
+        var expected = __$styleInject('.body{}',shouldBe)
+        expect(shouldBe).to.be.equal(expected)
+      })
+    })`
 
 module.exports = function (config) {
   config.set({
     frameworks: ['mocha', 'sinon-chai'],
     browsers: ['PhantomJS'],
     files: [
-      // '../html5/test/render/vue/components/*.js'
-      '../html5/test/render/vue/**/*.js'
+      '../html5/test/render/vue/utils/*.js',
+      '../html5/test/render/vue/core/*.js',
+      '../html5/test/render/vue/!(utils|core)/*.js'
     ],
-
     exclude: [
-      '../html5/test/render/vue/helper.js',
       '../html5/test/render/vue/helper/*.js',
       '../html5/test/render/vue/vender/**/*.js',
       '../html5/test/render/vue/data/**/*.js'
@@ -65,7 +89,7 @@ module.exports = function (config) {
         { type: 'text-summary', dir: absolute('../coverage'), subdir: 'vue-renderer' }
       ]
     },
-
+    browserDisconnectTimeout:10000,
     preprocessors: {
       '../html5/test/**/*.js': ['rollup'],
       '../html5/test/**/!(components|examples|core)/*.js': ['rollup', 'coverage']

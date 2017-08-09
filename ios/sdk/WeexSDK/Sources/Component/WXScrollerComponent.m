@@ -1,9 +1,20 @@
-/**
- * Created by Weex.
- * Copyright (c) 2016, Alibaba, Inc. All rights reserved.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * This source code is licensed under the Apache Licence 2.0.
- * For the full copyright and license information,please view the LICENSE file in the root directory of this source tree.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 #import "WXScrollerComponent.h"
@@ -54,8 +65,11 @@
     // left & right & up & down
     NSString *_direction;
     BOOL _showScrollBar;
+    BOOL _pagingEnabled;
 
     css_node_t *_scrollerCSSNode;
+    
+    NSHashTable* _delegates;
 }
 
 WX_EXPORT_METHOD(@selector(resetLoadmore))
@@ -93,6 +107,7 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
         _lastScrollEventFiredOffset = CGPointMake(0, 0);
         _scrollDirection = attributes[@"scrollDirection"] ? [WXConvert WXScrollDirection:attributes[@"scrollDirection"]] : WXScrollDirectionVertical;
         _showScrollBar = attributes[@"showScrollbar"] ? [WXConvert BOOL:attributes[@"showScrollbar"]] : YES;
+        _pagingEnabled = attributes[@"pagingEnabled"] ? [WXConvert BOOL:attributes[@"pagingEnabled"]] : NO;
         _loadMoreOffset = attributes[@"loadmoreoffset"] ? [WXConvert WXPixelType:attributes[@"loadmoreoffset"] scaleFactor:self.weexInstance.pixelScaleFactor] : 0;
         _loadmoreretry = attributes[@"loadmoreretry"] ? [WXConvert NSUInteger:attributes[@"loadmoreretry"]] : 0;
         _listenLoadMore = [events containsObject:@"loadmore"];
@@ -120,9 +135,9 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
 
 - (void)viewDidLoad
 {
+    [super viewDidLoad];
     [self setContentSize:_contentSize];
     UIScrollView* scrollView = (UIScrollView *)self.view;
-    scrollView.scrollEnabled = YES;
     scrollView.delegate = self;
     scrollView.exclusiveTouch = YES;
     scrollView.autoresizesSubviews = NO;
@@ -130,6 +145,7 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
     scrollView.showsVerticalScrollIndicator = _showScrollBar;
     scrollView.showsHorizontalScrollIndicator = _showScrollBar;
     scrollView.scrollEnabled = _scrollable;
+    scrollView.pagingEnabled = _pagingEnabled;
     
     if (self.ancestorScroller) {
         scrollView.scrollsToTop = NO;
@@ -168,6 +184,11 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
         _showScrollBar = [WXConvert BOOL:attributes[@"showScrollbar"]];
         ((UIScrollView *)self.view).showsHorizontalScrollIndicator = _showScrollBar;
         ((UIScrollView *)self.view).showsVerticalScrollIndicator = _showScrollBar;
+    }
+    
+    if (attributes[@"pagingEnabled"]) {
+        _pagingEnabled = [WXConvert BOOL:attributes[@"pagingEnabled"]];
+        ((UIScrollView *)self.view).pagingEnabled = _pagingEnabled;
     }
     
     if (attributes[@"loadmoreoffset"]) {
@@ -403,6 +424,28 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
     [scrollView setContentInset:contentInset];
 }
 
+- (void)addScrollDelegate:(id<UIScrollViewDelegate>)delegate
+{
+    if (delegate) {
+        if (!_delegates) {
+            _delegates = [NSHashTable hashTableWithOptions:NSPointerFunctionsWeakMemory];
+        }
+        [_delegates addObject:delegate];
+    }
+}
+
+- (void)removeScrollDelegate:(id<UIScrollViewDelegate>)delegate
+{
+    if (delegate) {
+        [_delegates removeObject:delegate];
+    }
+}
+
+- (WXScrollDirection)scrollDirection
+{
+    return _scrollDirection;
+}
+
 #pragma mark UIScrollViewDelegate
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView
@@ -426,8 +469,6 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
         _direction = @"up";
         [self handleLoadMore];
     }
-   
-    _lastContentOffset = scrollView.contentOffset;
     
     CGFloat scaleFactor = self.weexInstance.pixelScaleFactor;
     [_refreshComponent pullingdown:@{
@@ -436,7 +477,8 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
              REFRESH_PULLINGDISTANCE: @(scrollView.contentOffset.y/scaleFactor),
              @"type":@"pullingdown"
     }];
-
+    _lastContentOffset = scrollView.contentOffset;
+    
     // check sticky
     [self adjustSticky];
     [self handleAppear];
@@ -457,6 +499,12 @@ WX_EXPORT_METHOD(@selector(resetLoadmore))
         if (fabs(distance) >= _offsetAccuracy) {
             [self fireEvent:@"scroll" params:@{@"contentSize":contentSizeData,@"contentOffset":contentOffsetData} domChanges:nil];
             _lastScrollEventFiredOffset = scrollView.contentOffset;
+        }
+    }
+    
+    for (id<UIScrollViewDelegate> delegate in _delegates) {
+        if ([delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
+            [delegate scrollViewDidScroll:scrollView];
         }
     }
 }

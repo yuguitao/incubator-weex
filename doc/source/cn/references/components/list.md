@@ -44,6 +44,9 @@ version: 2.1
 - `loadmoreoffset {number}`：默认值为 0，触发 `loadmore` 事件所需要的垂直偏移距离（设备屏幕底部与 `<list>` 底部之间的距离）。当 `<list>` 的滚动条滚动到足够接近 `<list>` 底部时将会触发 `loadmore` 这个事件。
 - `offset-accuracy {number}` <sup class="wx-v">0.11+</sup>：控制`onscroll`事件触发的频率，默认值为10，表示两次`onscroll`事件之间列表至少滚动了10px。注意，将该值设置为较小的数值会提高滚动事件采样的精度，但同时也会降低页面的性能。
 
+  ![mobile_preview](../images/list_4.jpg)
+
+- `offset-accuracy`：默认值是0，触发 `scroll` 事件所需要的垂直偏移距离。
 ## 样式
 
 - 通用样式：支持所有通用样式
@@ -59,8 +62,8 @@ version: 2.1
 ## 事件
 
 - `loadmore` <sup class="wx-v">0.5+</sup>：如果列表滚动到底部将会立即触发这个事件，你可以在这个事件的处理函数中加载下一页的列表项。
-- `onscroll` <sup class="wx-v">0.11+</sup>: 列表发生滚动时将会触发该事件，事件的默认抽样率为10px，即列表每滚动10px触发一次，可通过属性`offset-accuracy`设置抽样率。    
-  
+- `scroll` <sup class="wx-v">0.11+</sup>: 列表发生滚动时将会触发该事件，事件的默认抽样率为10px，即列表每滚动10px触发一次，可通过属性`offset-accuracy`设置抽样率。    
+
   事件中 event 对象属性：
   - `contentSize {Object}`：列表的内容尺寸
     - `width {number}`: 列表内容宽度
@@ -68,6 +71,8 @@ version: 2.1
   - `contentOffset {Object}`: 列表的偏移尺寸
     - `x {number}`: x轴上的偏移量
     - `y {number}`: y轴上的偏移量
+
+  [体验一下](http://dotwe.org/bc445ede8746a31360e3607d210304c5)
 
 - 通用事件
 

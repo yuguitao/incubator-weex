@@ -1,9 +1,20 @@
-/**
- * Created by Weex.
- * Copyright (c) 2016, Alibaba, Inc. All rights reserved.
- *
- * This source code is licensed under the Apache Licence 2.0.
- * For the full copyright and license information,please view the LICENSE file in the root directory of this source tree.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 #import "WXComponent+BoxShadow.h"
@@ -18,7 +29,7 @@
 - (WXBoxShadow *_Nullable)getViewBoxShadow:(UIView *_Nullable)view
 {
     WXBoxShadow *boxShadow = [WXBoxShadow new];
-    boxShadow.shadowColor = view.layer.shadowColor;
+    boxShadow.shadowColor = [UIColor colorWithCGColor:view.layer.shadowColor];
     boxShadow.shadowOffset = view.layer.shadowOffset;
     boxShadow.shadowRadius = view.layer.shadowRadius;
     boxShadow.shadowOpacity =  view.layer.shadowOpacity;
@@ -29,7 +40,7 @@
 {
     UIBezierPath *shadowPath = [UIBezierPath bezierPathWithRect:self.view.bounds];
     self.view.layer.masksToBounds = NO;
-    self.view.layer.shadowColor = _originalBoxShadow.shadowColor;
+    self.view.layer.shadowColor = _originalBoxShadow.shadowColor.CGColor;
     self.view.layer.shadowOffset = _originalBoxShadow.shadowOffset;
     self.view.layer.shadowRadius = _originalBoxShadow.shadowRadius;
     self.view.layer.shadowOpacity = _originalBoxShadow.shadowOpacity;
@@ -44,11 +55,11 @@
 }
 
 // if not equal return NO, if equal return YES
-- (BOOL)EqualBoxShadow:(WXBoxShadow *_Nullable)boxShadow withBoxShadow:(WXBoxShadow *_Nullable)compareBoxShadow
+- (BOOL)equalBoxShadow:(WXBoxShadow *_Nullable)boxShadow withBoxShadow:(WXBoxShadow *_Nullable)compareBoxShadow
 {
     if(!compareBoxShadow && !boxShadow) {
         return YES;
-    } else if (CGColorEqualToColor(boxShadow.shadowColor,compareBoxShadow.shadowColor) &&
+    } else if (CGColorEqualToColor(boxShadow.shadowColor.CGColor,compareBoxShadow.shadowColor.CGColor) &&
                CGSizeEqualToSize(boxShadow.shadowOffset,compareBoxShadow.shadowOffset) &&
                WXFloatEqual(boxShadow.shadowRadius,compareBoxShadow.shadowRadius)&& (boxShadow.isInset == compareBoxShadow.isInset))
     {
@@ -80,7 +91,7 @@
     } else {
         UIBezierPath *shadowPath = [UIBezierPath bezierPathWithRect:self.view.bounds];
         self.view.layer.masksToBounds = NO;
-        self.view.layer.shadowColor = boxShadow.shadowColor;
+        self.view.layer.shadowColor = boxShadow.shadowColor.CGColor;
         self.view.layer.shadowOffset = boxShadow.shadowOffset;
         self.view.layer.shadowRadius = boxShadow.shadowRadius;
         self.view.layer.shadowOpacity = boxShadow.shadowOpacity;

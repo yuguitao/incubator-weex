@@ -1,11 +1,35 @@
-import { camelToKebab, appendCss } from '../utils'
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import { camelToKebab, appendCss, isArray } from '../utils'
+import config from '../config'
 
 function getParentScroller (vnode) {
   if (!vnode) return null
-  if (vnode.weexType === 'scroller' || vnode.weexType === 'list') {
-    return vnode
+  const vm = vnode.$el
+    ? vnode : vnode.elm
+    ? vnode.componentInstance || vnode.context : null
+  if (!vm) return null
+  const type = vm.$el && vm.$el.getAttribute('weex-type')
+  if (config.scrollableTypes.indexOf(type) > -1) {
+    return vm
   }
-  return getParentScroller(vnode.$parent)
+  return getParentScroller(vm.$parent)
 }
 
 function now () {
@@ -41,7 +65,12 @@ function step (context) {
   context.method.call(context.scrollable, context.dSuffix, currentPosition)
 
   // return when end points have been reached
-  if (currentPosition === context.position) {
+  /**
+   * NOTE: should use ~~ to parse position number into integer. Otherwise
+   * this two float numbers maybe have a slicely little difference, which
+   * will cause this function never to stop.
+   */
+  if (~~currentPosition === ~~context.position) {
     window.cancelAnimationFrame(context.frame)
     return
   }
@@ -60,26 +89,54 @@ function ease (k) {
 export default {
   /**
    * scrollToElement
-   * @param  {String} vnode
+   * @param  {Vnode | VComponent} vnode
    * @param  {Object} options {offset:Number}
    *   ps: scroll-to has 'ease' and 'duration'(ms) as options.
    */
   scrollToElement: function (vnode, options) {
-    const scroller = getParentScroller(vnode)
-    const scrollDirection = scroller.scrollDirection || 'vertical'
+    if (isArray(vnode)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[vue-render] the ref passed to animation.transitionOnce is a array.')
+      }
+      vnode = vnode[0]
+    }
 
-    if (scroller && scroller.$el && vnode.$el) {
+    const scroller = getParentScroller(vnode)
+    const scrollDirection = scroller && scroller.scrollDirection || 'vertical'
+
+    const isWindow = !scroller
+    const ct = isWindow ? document.body : scroller.$el
+    const el = vnode.$el || vnode.elm
+
+    if (ct && el) {
       // if it's a list, then the listVnode.scrollDirection is undefined. just
       // assum it is the default value 'vertical'.
       const dSuffix = ({
         horizontal: 'Left',
         vertical: 'Top'
       })[scrollDirection]
-      let offset = vnode.$el[`offset${dSuffix}`]
+
+      const ctRect = ct.getBoundingClientRect()
+      let elRect = el.getBoundingClientRect()
+
+      /**
+       * if it's a waterfall, and you want to scroll to a header, then just
+       * scroll to the top.
+       */
+      if (scroller
+        && scroller.weexType === 'waterfall'
+        && scroller._headers
+        && scroller._headers.indexOf(vnode.$vnode || vnode) > -1) {
+        // it's in waterfall. just scroll to the top.
+        elRect = ct.firstElementChild.getBoundingClientRect()
+      }
+
+      const dir = dSuffix.toLowerCase()
+      let offset = (isWindow ? 0 : ct[`scroll${dSuffix}`]) + elRect[dir] - ctRect[dir]
 
       if (options) {
-        offset += Number(options.offset) || 0
-        offset *= weex.config.env.scale /* adapt offset to different screen scales. */
+        offset += options.offset && options.offset * weex.config.env.scale || 0
+        // offset *= weex.config.env.scale /* adapt offset to different screen scales. */
       }
       else if (process.env.NODE_ENV === 'development') {
         console.warn('[Vue Render] The second parameter of "scrollToElement" is required, '
@@ -87,14 +144,14 @@ export default {
       }
 
       if (options && options.animated === false) {
-        return scrollElement.call(scroller.$el, dSuffix, offset)
+        return scrollElement.call(ct, dSuffix, offset)
       }
 
       step({
-        scrollable: scroller.$el,
+        scrollable: ct,
         startTime: now(),
         frame: null,
-        startPosition: scroller.$el[`scroll${dSuffix}`],
+        startPosition: ct[`scroll${dSuffix}`],
         position: offset,
         method: scrollElement,
         dSuffix: dSuffix
@@ -108,22 +165,39 @@ export default {
    * @param {Function} callback
    */
   getComponentRect: function (vnode, callback) {
+    if (isArray(vnode)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[vue-render] the ref passed to animation.transitionOnce is a array.')
+      }
+      vnode = vnode[0]
+    }
+
+    const scale = window.weex.config.env.scale
     const info = { result: false }
+    const rectKeys = ['width', 'height', 'top', 'bottom', 'left', 'right']
+
+    function recalc (rect) {
+      const res = {}
+      rectKeys.forEach(key => {
+        res[key] = rect[key] / scale
+      })
+      return res
+    }
 
     if (vnode && vnode === 'viewport') {
       info.result = true
-      info.size = {
+      info.size = recalc({
         width: document.documentElement.clientWidth,
         height: document.documentElement.clientHeight,
         top: 0,
         left: 0,
         right: document.documentElement.clientWidth,
         bottom: document.documentElement.clientHeight
-      }
+      })
     }
     else if (vnode && vnode.$el) {
       info.result = true
-      info.size = vnode.$el.getBoundingClientRect()
+      info.size = recalc(vnode.$el.getBoundingClientRect())
     }
 
     const message = info.result ? info : {

@@ -1,19 +1,78 @@
-/**
- * Created by Weex.
- * Copyright (c) 2016, Alibaba, Inc. All rights reserved.
- *
- * This source code is licensed under the Apache Licence 2.0.
- * For the full copyright and license information,please view the LICENSE file in the root directory of this source tree.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 #import "WXComponent+ViewManagement.h"
 #import "WXComponent_internal.h"
-#import "WXComponent+GradientColor.h"
 #import "WXComponent+BoxShadow.h"
 #import "WXAssert.h"
 #import "WXView.h"
 #import "WXSDKInstance_private.h"
 #import "WXTransform.h"
+#import "WXTracingManager.h"
+
+#define WX_BOARD_RADIUS_RESET_ALL(key)\
+do {\
+    if (styles && [styles containsObject:@#key]) {\
+        _borderTopLeftRadius = _borderTopRightRadius = _borderBottomLeftRadius = _borderBottomRightRadius = 0;\
+        [self setNeedsDisplay];\
+    }\
+} while(0);
+
+#define WX_BOARD_RADIUS_RESET(key)\
+do {\
+    if (styles && [styles containsObject:@#key]) {\
+    _##key = 0;\
+    [self setNeedsDisplay];\
+    }\
+} while(0);
+
+#define WX_BOARD_WIDTH_RESET_ALL(key)\
+do {\
+    if (styles && [styles containsObject:@#key]) {\
+        _borderTopWidth = _borderLeftWidth = _borderRightWidth = _borderBottomWidth = 0;\
+        [self setNeedsLayout];\
+    }\
+} while(0);
+
+#define WX_BOARD_WIDTH_RESET(key)\
+do {\
+    if (styles && [styles containsObject:@#key]) {\
+        _##key = 0;\
+        [self setNeedsLayout];\
+    }\
+} while(0);
+
+#define WX_BOARD_RADIUS_COLOR_RESET_ALL(key)\
+do {\
+    if (styles && [styles containsObject:@#key]) {\
+        _borderTopColor = _borderLeftColor = _borderRightColor = _borderBottomColor = [UIColor blackColor];\
+        [self setNeedsDisplay];\
+    }\
+} while(0);
+
+#define WX_BOARD_COLOR_RESET(key)\
+do {\
+    if (styles && [styles containsObject:@#key]) {\
+        _##key = [UIColor blackColor];\
+        [self setNeedsDisplay];\
+    }\
+} while(0);
 
 #pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
 
@@ -35,6 +94,7 @@
 {
     WXAssertMainThread();
     
+    WX_CHECK_COMPONENT_TYPE(self.componentType)
     if (subcomponent->_positionType == WXPositionTypeFixed) {
         [self.weexInstance.rootView addSubview:subcomponent.view];
         return;
@@ -66,6 +126,7 @@
 
 - (void)moveToSuperview:(WXComponent *)newSupercomponent atIndex:(NSUInteger)index
 {
+    WX_CHECK_COMPONENT_TYPE(self.componentType)
     [self removeFromSuperview];
     [newSupercomponent insertSubview:self atIndex:index];
 }
@@ -77,6 +138,7 @@
 
 - (void)viewDidLoad
 {
+    [WXTracingManager startTracingWithInstanceId:self.weexInstance.instanceId ref:self.ref className:nil name:_type phase:WXTracingEnd functionName:WXTRender options:nil];
     WXAssertMainThread();
 }
 
@@ -95,7 +157,7 @@
 - (void)_initViewPropertyWithStyles:(NSDictionary *)styles
 {
     _backgroundColor = styles[@"backgroundColor"] ? [WXConvert UIColor:styles[@"backgroundColor"]] : [UIColor clearColor];
-    _backgroundImage = styles[@"backgroundImage"] ? [[WXConvert NSString:styles[@"backgroundImage"]]stringByReplacingOccurrencesOfString:@" " withString:@""]: nil;
+    _backgroundImage = styles[@"backgroundImage"] ? [WXConvert NSString:styles[@"backgroundImage"]]: nil;
     _opacity = styles[@"opacity"] ? [WXConvert CGFloat:styles[@"opacity"]] : 1.0;
     _clipToBounds = styles[@"overflow"] ? [WXConvert WXClipType:styles[@"overflow"]] : NO;
     _visibility = styles[@"visibility"] ? [WXConvert WXVisibility:styles[@"visibility"]] : WXVisibilityShow;
@@ -111,6 +173,7 @@
 
 - (void)_updateViewStyles:(NSDictionary *)styles
 {
+    WX_CHECK_COMPONENT_TYPE(self.componentType)
     if (styles[@"boxShadow"]) {
         _lastBoxShadow = _boxShadow;
         _boxShadow = styles[@"boxShadow"]?[WXConvert WXBoxShadow:styles[@"boxShadow"] scaleFactor:self.weexInstance.pixelScaleFactor]:nil;
@@ -124,7 +187,7 @@
     }
     
     if (styles[@"backgroundImage"]) {
-        _backgroundImage = styles[@"backgroundImage"] ? [[WXConvert NSString:styles[@"backgroundImage"]]stringByReplacingOccurrencesOfString:@" " withString:@""]: nil;
+        _backgroundImage = styles[@"backgroundImage"] ? [WXConvert NSString:styles[@"backgroundImage"]]: nil;
         
         if (_backgroundImage) {
             [self setGradientLayer];
@@ -149,17 +212,19 @@
             [self.ancestorScroller removeStickyComponent:self];
         }
         
-        if (positionType == WXPositionTypeFixed) {
-            [self.weexInstance.componentManager addFixedComponent:self];
-            _isNeedJoinLayoutSystem = NO;
-            [self.supercomponent _recomputeCSSNodeChildren];
-        } else if (_positionType == WXPositionTypeFixed) {
-            [self.weexInstance.componentManager removeFixedComponent:self];
-            _isNeedJoinLayoutSystem = YES;
-            [self.supercomponent _recomputeCSSNodeChildren];
-        }
-        
-        _positionType = positionType;
+        WXPerformBlockOnComponentThread(^{
+            if (positionType == WXPositionTypeFixed) {
+                [self.weexInstance.componentManager addFixedComponent:self];
+                _isNeedJoinLayoutSystem = NO;
+                [self.supercomponent _recomputeCSSNodeChildren];
+            } else if (_positionType == WXPositionTypeFixed) {
+                [self.weexInstance.componentManager removeFixedComponent:self];
+                _isNeedJoinLayoutSystem = YES;
+                [self.supercomponent _recomputeCSSNodeChildren];
+            }
+            
+            _positionType = positionType;
+        });
     }
     
     if (styles[@"visibility"]) {
@@ -171,16 +236,42 @@
             self.view.hidden = YES;
         }
     }
-    
-    if (styles[@"transformOrigin"] || styles[@"transform"]) {
-        id transform = styles[@"transform"] ? : self.styles[@"transform"];
-        id transformOrigin = styles[@"transformOrigin"] ? [WXConvert NSString:styles[@"transformOrigin"]] : [WXConvert NSString:self.styles[@"transformOrigin"]];
-        _transform = [[WXTransform alloc] initWithCSSValue:[WXConvert NSString:transform] origin:transformOrigin instance:self.weexInstance];
+    if (styles[@"transform"]) {
+        _transform = [[WXTransform alloc] initWithCSSValue:[WXConvert NSString:styles[@"transform"]] origin:[WXConvert NSString:self.styles[@"transformOrigin"]] instance:self.weexInstance];
         if (!CGRectEqualToRect(self.calculatedFrame, CGRectZero)) {
             [_transform applyTransformForView:_view];
             [_layer setNeedsDisplay];
         }
     }
+    
+    if (styles[@"transformOrigin"]) {
+        [_transform setTransformOrigin:[WXConvert NSString:styles[@"transformOrigin"]]];
+        if (!CGRectEqualToRect(self.calculatedFrame, CGRectZero)) {
+            [_transform applyTransformForView:_view];
+            [_layer setNeedsDisplay];
+        }
+    }
+}
+
+-(void)resetBorder:(NSArray *)styles
+{
+    WX_BOARD_RADIUS_RESET_ALL(borderRadius);
+    WX_BOARD_RADIUS_RESET(borderTopLeftRadius);
+    WX_BOARD_RADIUS_RESET(borderTopRightRadius);
+    WX_BOARD_RADIUS_RESET(borderBottomLeftRadius);
+    WX_BOARD_RADIUS_RESET(borderBottomRightRadius);
+    
+    WX_BOARD_WIDTH_RESET_ALL(borderWidth);
+    WX_BOARD_WIDTH_RESET(borderTopWidth);
+    WX_BOARD_WIDTH_RESET(borderLeftWidth);
+    WX_BOARD_WIDTH_RESET(borderRightWidth);
+    WX_BOARD_WIDTH_RESET(borderBottomWidth);
+    
+    WX_BOARD_RADIUS_COLOR_RESET_ALL(borderColor);
+    WX_BOARD_COLOR_RESET(borderTopColor);
+    WX_BOARD_COLOR_RESET(borderLeftColor);
+    WX_BOARD_COLOR_RESET(borderRightColor);
+    WX_BOARD_COLOR_RESET(borderBottomColor);
 }
 
 -(void)_resetStyles:(NSArray *)styles
@@ -194,6 +285,12 @@
         _boxShadow = nil;
         [self setNeedsDisplay];
     }
+    if (styles && [styles containsObject:@"backgroundImage"]) {
+        _backgroundImage = @"linear-gradient(to left,rgba(255,255,255,0),rgba(255,255,255,0))"; // if backgroundImage is nil, give defalut color value.
+        [self setGradientLayer];
+    }
+    
+    [self resetBorder:styles];
 }
 
 - (void)_unloadViewWithReusing:(BOOL)isReusing

@@ -1,7 +1,24 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 import { extractComponentStyle, createEventMap } from '../../core'
 import { scrollable } from '../../mixins'
 // import { validateStyles } from '../../validator'
-import { extend } from '../../utils'
 import listMixin from './list/listMixin'
 
 export default {
@@ -13,15 +30,6 @@ export default {
       validator (value) {
         return ['horizontal', 'vertical'].indexOf(value) !== -1
       }
-    },
-    loadmoreoffset: {
-      type: [String, Number],
-      default: 0
-    },
-    // TODO: support loadmore retry
-    loadmoreretry: {
-      type: [String, Number],
-      default: 0
     }
   },
 
@@ -51,12 +59,6 @@ export default {
           staticClass: 'weex-scroller-inner weex-ct'
         }, this._cells)
       ]
-    },
-    scrollTo (vnode) {
-      if (vnode && vnode.$el) {
-        // TODO: add animation
-        this.$el.scrollTop = vnode.$el.offsetTop
-      }
     }
   },
 
@@ -73,10 +75,11 @@ export default {
       this.updateLayout()
     })
 
+    this._renderHook()
     return createElement('main', {
       ref: 'wrapper',
       attrs: { 'weex-type': 'scroller' },
-      on: extend(createEventMap(this), {
+      on: createEventMap(this, {
         scroll: this.handleScroll,
         touchstart: this.handleTouchStart,
         touchmove: this.handleTouchMove,
